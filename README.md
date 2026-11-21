@@ -9,10 +9,13 @@ REST API for **HatKaj**, a smart maintenance and service booking platform (AC se
 
 The interesting parts: **double-booking prevention**, a **status workflow with enforced transitions**, and an **audit log** of every status change. It runs fully local on SQLite with no paid services.
 
-<!-- Screenshot placeholders: add real images to docs/screenshots/ -->
-| Create booking | Slot conflict (409) | Test run |
-|---|---|---|
-| ![create](docs/screenshots/create-booking.png) | ![conflict](docs/screenshots/conflict.png) | ![tests](docs/screenshots/tests.png) |
+Real responses from the running API and test suite:
+
+| Create booking (201) | Slot conflict (409) |
+|---|---|
+| ![Creating a booking returns 201 with the booking and its service](docs/screenshots/create-booking.png) | ![Booking the same slot again returns 409 Conflict](docs/screenshots/conflict.png) |
+
+![All 19 tests passing](docs/screenshots/tests.png)
 
 ## Contents
 - [Features](#features)
