@@ -1,58 +1,75 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# HatKaj API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Backend for **HatKaj**, a smart maintenance and service booking platform (AC servicing, plumbing, electrical, cleaning). Built with Laravel; consumed by the [`hatkaj-app`](../hatkaj-app) Flutter client.
 
-## About Laravel
+<!-- Screenshot placeholders: replace with real images in docs/screenshots/ -->
+| Postman: create booking | 409 slot conflict | Test run |
+|---|---|---|
+| ![create](docs/screenshots/create-booking.png) | ![conflict](docs/screenshots/conflict.png) | ![tests](docs/screenshots/tests.png) |
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Features
+- List active services and bookings (paginated, filterable by `status`, `service_id`, `date`)
+- Create bookings with validation and **double-booking prevention**
+- Booking status workflow with enforced transitions and an audit log
+- Eloquent API Resources, FormRequests, feature tests (19 passing)
+- Runs locally on SQLite, with no paid services
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
+## Setup
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+cp .env.example .env
+php artisan key:generate
+touch database/database.sqlite      # PowerShell: ni database/database.sqlite
+php artisan migrate --seed
+php artisan serve --host=0.0.0.0    # http://localhost:8000
+php artisan test
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+## Architecture
+```
+Controller (thin) -> FormRequest (validation) -> BookingService (business rules) -> Models
+                                                     |-> SlotConflictException (409)
+                                                     |-> InvalidStatusTransitionException (422)
+```
+- `app/Enums/BookingStatus.php`: statuses plus the allowed-transition map (single source of truth).
+- `app/Services/BookingService.php`: slot-conflict check and status changes, each in a DB transaction.
+- `booking_status_logs`: one row per status change (from/to), so history is never lost.
 
-## Contributing
+## API
+Base URL: `/api`. Errors are JSON: `{"message": "..."}` (plus `errors` on 422).
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+| Method | Path | Description |
+|---|---|---|
+| GET | `/services` | Active services |
+| GET | `/bookings` | Paginated. Query: `status`, `service_id`, `date` (Y-m-d), `per_page` (1-50), `page` |
+| POST | `/bookings` | Create a pending booking |
+| PATCH | `/bookings/{id}/status` | Change status |
 
-## Code of Conduct
+**POST /api/bookings**
+```json
+{
+  "service_id": 1,
+  "customer_name": "Rahim",
+  "customer_phone": "01712345678",
+  "address": "Dhaka",
+  "scheduled_at": "2026-12-30T10:00:00+06:00",
+  "notes": "optional"
+}
+```
+- `201` created, `422` validation error, `409` slot already booked.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+**PATCH /api/bookings/{id}/status** with `{"status": "confirmed"}`
 
-## Security Vulnerabilities
+| From | Allowed next |
+|---|---|
+| pending | confirmed, cancelled |
+| confirmed | completed, cancelled |
+| completed / cancelled | none (`422`) |
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Key engineering trade-offs
+- **Conflict rule**: each service has a fixed duration, so two bookings overlap exactly when their start times are less than one duration apart. This needs no end-time column. It would need revisiting for variable-length jobs.
+- **Concurrency**: the check runs inside a transaction with `lockForUpdate()`. This is effective on MySQL/PostgreSQL. SQLite serialises writes anyway, so it is safe locally. A DB-level exclusion constraint would be stronger on Postgres.
+- **Cancelled bookings free the slot**: only pending and confirmed bookings block it.
+- **Status as string + PHP enum**: portable across databases and easy to extend, with transitions validated in code rather than DB enums.
+- **No authentication**: a deliberate scope limit for the portfolio. Next step would be Sanctum with per-customer bookings.
+- **Service layer**: used only where there is real business logic (bookings). Services are a plain read, so the controller queries directly.
