@@ -20,7 +20,7 @@ enum BookingStatus: string
     }
 
     /**
-     * Allowed next statuses (used by the status-update endpoint in Checkpoint 2).
+     * Allowed next statuses (used by the status-update endpoint).
      *
      * @return array<int, self>
      */
