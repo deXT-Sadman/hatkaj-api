@@ -59,10 +59,15 @@ curl -H "Accept: application/json" http://localhost:8000/api/services
 
 ## API reference
 
-Base URL: `http://localhost:8000/api`. Send `Accept: application/json`. No authentication (see [Roadmap](#roadmap)).
+Base URL: `http://localhost:8000/api`. Send `Accept: application/json`. Auth and profile routes use Laravel Sanctum bearer tokens (`Authorization: Bearer <token>`); booking routes are still public until the next checkpoint.
 
 | Method | Path | Description | Success |
 |---|---|---|---|
+| POST | `/register` | Create an account, returns `{ user, token }` | 201 |
+| POST | `/login` | Log in, returns `{ user, token }` | 200 |
+| POST | `/logout` | Revoke the current token (auth) | 200 |
+| GET | `/profile` | Current user's profile (auth) | 200 |
+| PUT | `/profile` | Update `name`, `phone`, `default_address` (auth) | 200 |
 | GET | `/services` | Active services, sorted by name | 200 |
 | GET | `/bookings` | Paginated bookings, soonest first | 200 |
 | POST | `/bookings` | Create a pending booking | 201 |
