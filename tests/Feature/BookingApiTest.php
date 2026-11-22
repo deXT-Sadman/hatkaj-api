@@ -5,12 +5,24 @@ namespace Tests\Feature;
 use App\Enums\BookingStatus;
 use App\Models\Booking;
 use App\Models\Service;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class BookingApiTest extends TestCase
 {
     use RefreshDatabase;
+
+    private User $user;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->user = User::factory()->create();
+        Sanctum::actingAs($this->user);
+    }
 
     /**
      * @param  array<string, mixed>  $overrides
@@ -96,8 +108,8 @@ class BookingApiTest extends TestCase
 
     public function test_it_lists_bookings_with_filters(): void
     {
-        Booking::factory()->withStatus(BookingStatus::Pending)->create();
-        Booking::factory()->withStatus(BookingStatus::Confirmed)->count(2)->create();
+        Booking::factory()->for($this->user)->withStatus(BookingStatus::Pending)->create();
+        Booking::factory()->for($this->user)->withStatus(BookingStatus::Confirmed)->count(2)->create();
 
         $this->getJson('/api/bookings')->assertOk()->assertJsonCount(3, 'data');
         $this->getJson('/api/bookings?status=confirmed')->assertOk()->assertJsonCount(2, 'data');
@@ -106,7 +118,7 @@ class BookingApiTest extends TestCase
 
     public function test_it_updates_status_along_a_valid_transition_and_logs_it(): void
     {
-        $booking = Booking::factory()->create();
+        $booking = Booking::factory()->for($this->user)->create();
 
         $this->patchJson("/api/bookings/{$booking->id}/status", ['status' => 'confirmed'])
             ->assertOk()
@@ -121,7 +133,7 @@ class BookingApiTest extends TestCase
 
     public function test_it_rejects_an_invalid_status_transition(): void
     {
-        $booking = Booking::factory()->create();
+        $booking = Booking::factory()->for($this->user)->create();
 
         $this->patchJson("/api/bookings/{$booking->id}/status", ['status' => 'completed'])
             ->assertUnprocessable()

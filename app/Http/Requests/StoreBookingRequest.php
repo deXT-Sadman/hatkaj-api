@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\PaymentMethod;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -11,6 +12,20 @@ class StoreBookingRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * Fall back to the account's profile for contact details the client omits.
+     */
+    protected function prepareForValidation(): void
+    {
+        $user = $this->user();
+
+        $this->mergeIfMissing([
+            'customer_name' => $user?->name,
+            'customer_phone' => $user?->phone,
+            'address' => $user?->default_address,
+        ]);
     }
 
     /**
@@ -24,6 +39,7 @@ class StoreBookingRequest extends FormRequest
             'customer_phone' => ['required', 'string', 'regex:/^\+?[0-9\s\-]{7,20}$/'],
             'address' => ['required', 'string', 'max:255'],
             'scheduled_at' => ['required', 'date', 'after:now'],
+            'payment_method' => ['sometimes', Rule::enum(PaymentMethod::class)],
             'notes' => ['nullable', 'string', 'max:500'],
         ];
     }

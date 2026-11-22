@@ -59,7 +59,7 @@ curl -H "Accept: application/json" http://localhost:8000/api/services
 
 ## API reference
 
-Base URL: `http://localhost:8000/api`. Send `Accept: application/json`. Auth and profile routes use Laravel Sanctum bearer tokens (`Authorization: Bearer <token>`); booking routes are still public until the next checkpoint.
+Base URL: `http://localhost:8000/api`. Send `Accept: application/json`. Auth and profile routes use Laravel Sanctum bearer tokens (`Authorization: Bearer <token>`); all `/bookings` routes also require a token and only see the caller's own bookings.
 
 | Method | Path | Description | Success |
 |---|---|---|---|
@@ -69,9 +69,14 @@ Base URL: `http://localhost:8000/api`. Send `Accept: application/json`. Auth and
 | GET | `/profile` | Current user's profile (auth) | 200 |
 | PUT | `/profile` | Update `name`, `phone`, `default_address` (auth) | 200 |
 | GET | `/services` | Active services, sorted by name | 200 |
-| GET | `/bookings` | Paginated bookings, soonest first | 200 |
-| POST | `/bookings` | Create a pending booking | 201 |
-| PATCH | `/bookings/{id}/status` | Change a booking's status | 200 |
+| GET | `/bookings` | Your paginated bookings, soonest first (auth) | 200 |
+| POST | `/bookings/preview` | Checkout summary and price breakdown, nothing saved (auth) | 200 |
+| POST | `/bookings` | Create a pending booking (auth) | 201 |
+| PATCH | `/bookings/{id}/status` | Change your booking's status (auth) | 200 |
+
+### Checkout
+
+`POST /bookings/preview` and `POST /bookings` take the same body. `customer_name`, `customer_phone` and `address` default to the account profile when omitted. `payment_method` is `cash_on_service` (default) or `demo_wallet`; no payment is processed. Both responses carry `pricing: { base_price, service_fee, total_amount }`. The fee is `BOOKING_SERVICE_FEE_PERCENT` (default 5) of the service price, and `POST /bookings` stores it as a snapshot. Preview returns `409` if the slot is taken.
 
 ### GET /services
 

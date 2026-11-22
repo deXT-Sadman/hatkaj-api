@@ -23,6 +23,12 @@ class BookingResource extends JsonResource
             'address' => $this->address,
             'scheduled_at' => $this->scheduled_at->toIso8601String(),
             'status' => $this->status->value,
+            'payment_method' => $this->payment_method->value,
+            'pricing' => [
+                'base_price' => $this->base_price,
+                'service_fee' => $this->service_fee,
+                'total_amount' => $this->total_amount,
+            ],
             'notes' => $this->notes,
             'service' => new ServiceResource($this->whenLoaded('service')),
             'created_at' => $this->created_at->toIso8601String(),
